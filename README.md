@@ -1,19 +1,43 @@
 # Hashage simple en HolyC
 
-Petit programme en **HolyC** qui lit une ligne de texte, calcule un hash simple, puis affiche le résultat en **hexadécimal**.
+Petit programme en **HolyC** qui lit une ligne de texte, calcule un **hash maison 256 bits inspiré de SHA-256**, puis affiche le résultat en **hexadécimal**.
 
 ## Ce que fait le programme
 
 - demande un texte à l'utilisateur ;
 - lit jusqu'à **255 caractères** ;
-- accepte maintenant les **espaces** dans la saisie ;
-- calcule un hash avec la formule suivante :
+- accepte les **espaces** dans la saisie ;
+- applique un hash **plus complexe et moins prédictible** que l'ancien FNV-1a ;
+- affiche le texte lu puis le digest hexadécimal sur **64 caractères**.
+
+## Ce qui a changé
+
+Le projet n'utilise plus un hash très simple de type multiplicatif, ni le FNV-1a 64 bits de la version précédente.
+
+À la place, il utilise maintenant un **hash maison 256 bits inspiré de SHA-256** avec :
+
+- un état interne de **8 mots de 32 bits** ;
+- un traitement par **blocs de 64 octets** ;
+- un **padding** avec bit `1`, zéros, puis longueur du message ;
+- des opérations de **rotation**, **XOR**, **choix** (`Ch`) et **majorité** (`Maj`) ;
+- un mini **message schedule** recalculé sur 64 tours.
+
+> Ce hash est **inspiré** de SHA-256 dans sa structure générale, mais il **n'est pas compatible SHA-256** et ne doit pas être considéré comme cryptographiquement sûr.
+
+## Structure de l'algorithme
+
+Le cœur du mélange utilise des fonctions proches, dans l'esprit, de SHA-256 :
 
 ```c
-hash = hash * 31 + *s;
+Ch(x, y, z)
+Maj(x, y, z)
+BigSigma0(x)
+BigSigma1(x)
+SmallSigma0(x)
+SmallSigma1(x)
 ```
 
-- affiche le texte lu puis le hash en hexadécimal sur **16 caractères**.
+Chaque bloc de 64 octets est absorbé dans un état initialisé avec 8 constantes de 32 bits, puis mélangé sur **64 rounds**.
 
 ## Fichier principal
 
@@ -57,8 +81,9 @@ Sortie :
 ```text
 Texte a hash : bonjour tout le monde
 Texte lu : bonjour tout le monde
+Algorithme : Hash maison 256 bits inspire de SHA-256
 Longueur max supportee : 255 caracteres
-Hash (hex) : ...
+Hash (hex) : 64-caracteres-hexadecimaux
 ```
 
 ## Limites actuelles
@@ -74,28 +99,30 @@ Donc :
 - la lecture est limitée à **255 caractères** ;
 - la saisie peut contenir des espaces ;
 - le programme lit une seule ligne ;
-- ce hash est **simple et non cryptographique**.
+- ce hash est **plus complexe**, mais reste un **hash maison non standard** ;
+- il est **plus proche dans l'esprit de SHA-256**, sans être un SHA-256 officiel.
 
 ## Fonctionnement du hash
 
 La fonction principale de hashage est :
 
 ```c
-U64 HashStr(U8 *s)
+U0 HashStr(U8 *s, U32 digest[8])
 ```
 
 Elle :
 
-1. prend une chaîne de caractères en entrée ;
-2. parcourt la chaîne caractère par caractère ;
-3. mélange les valeurs dans une variable `U64` ;
-4. renvoie le hash final.
+1. mesure la longueur de la chaîne ;
+2. construit un message paddé aligné sur 64 octets ;
+3. initialise un état de 8 mots ;
+4. traite chaque bloc via `ProcessBlock` ;
+5. produit un digest final de **256 bits**.
 
-Le hash retourné est stocké sur **64 bits**.
+L'affichage concatène ensuite les 8 mots de 32 bits en hexadécimal.
 
 ## Pistes d'amélioration
 
-- comparer ce hash simple avec une implémentation de **SHA-256** ;
-- ajouter des tests avec plusieurs entrées ;
-- gérer les entrées vides et les chaînes plus longues ;
-- séparer encore davantage l'I/O et la logique de hashage.
+- comparer ce hash maison avec un vrai **SHA-256** ;
+- ajouter des tests avec plusieurs entrées et digests attendus ;
+- sortir l'algorithme dans un fichier séparé ;
+- ajouter un mode comparaison entre plusieurs algorithmes.
