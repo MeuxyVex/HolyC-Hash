@@ -72,32 +72,28 @@ Attendu :
 
 ### Integration Python via `ctypes`
 
-Un exemple plus robuste est fourni dans `python_ctypes_example.py` : il accepte un chemin de bibliotheque en argument, regarde aussi `HOLYC_HASH_LIB`, ignore les fichiers qui ne ressemblent pas a des `.so`, puis affiche une erreur claire si aucune bibliotheque chargeable n'est trouvee.
+Un exemple plus robuste est fourni dans `python_ctypes_example.py` : il prefere une bibliotheque partagee `.so` via `ctypes`, mais peut aussi utiliser un executable compile (souvent `a.out`) en mode fallback via `subprocess`.
 
 Principe :
 
-1. charger une future bibliotheque partagee (ex. `libholyc_hash.so`) ;
+1. essayer d'abord de charger une bibliotheque partagee (ex. `libholyc_hash.so`) ;
 2. accepter eventuellement son chemin via argument CLI ou `HOLYC_HASH_LIB` ;
-3. ignorer les binaires executables qui ne sont pas des bibliotheques partagees ;
-4. declarer la signature de `HashTextHex` ;
-5. envoyer un `bytes` UTF-8 ;
-6. recuperer le buffer de sortie hexadecimal.
+3. si aucune `.so` n'est disponible, chercher un executable HolyC (ex. `a.out`) via argument CLI ou `HOLYC_HASH_EXE` ;
+4. en mode lib, declarer la signature de `HashTextHex` ;
+5. en mode executable, envoyer le texte sur `stdin` et parser la ligne `Hash (hex) : ...` ;
+6. recuperer le hash hexadecimal final.
 
 Extrait Python :
 
 ```python
 import ctypes
 
-# soit : python3 python_ctypes_example.py "bonjour" /chemin/vers/libholyc_hash.so
-# soit : HOLYC_HASH_LIB=/chemin/vers/libholyc_hash.so python3 python_ctypes_example.py
+# mode .so : python3 python_ctypes_example.py "bonjour" /chemin/vers/libholyc_hash.so
+# mode executable : python3 python_ctypes_example.py "bonjour" ./a.out
+# ou via variables HOLYC_HASH_LIB / HOLYC_HASH_EXE
 
-lib = load_library()
-lib.HashTextHex.argtypes = [ctypes.c_char_p, ctypes.POINTER(ctypes.c_char)]
-lib.HashTextHex.restype = None
-
-out = ctypes.create_string_buffer(65)
-lib.HashTextHex(b"bonjour tout le monde", out)
-print(out.value.decode("ascii"))
+hash_text, backend = build_hasher()
+print(hash_text("bonjour tout le monde"), backend)
 ```
 
 ## Limites actuelles
@@ -105,12 +101,13 @@ print(out.value.decode("ascii"))
 - le binaire CLI lit toujours une seule ligne avec `scanf(" %255[^\n]", texte)` ;
 - l'entree CLI est limitee a **255 caracteres** ;
 - la partie **bibliotheque** est prete au niveau API, mais la commande exacte pour produire une `.so` depend encore de ton environnement `hcc` Ubuntu ;
+- si tu n'as qu'un `a.out`, le script Python peut maintenant l'utiliser comme fallback via `subprocess`, tant que la sortie conserve la ligne `Hash (hex) : ...` ;
 - comme il s'agit d'un hash maison, il faut ajouter des **tests de reference** si tu veux garantir la compatibilite entre HolyC et Python.
 
 ## Fichiers
 
 - `hashage.HC` : implementation du hash, API reutilisable et CLI ;
-- `python_ctypes_example.py` : exemple Python avec recherche de bibliotheque, filtrage des faux positifs (comme un `a.out` executable) et message d'erreur utile si aucun `.so` valide n'est disponible.
+- `python_ctypes_example.py` : exemple Python hybride, avec priorite a la `.so` via `ctypes`, puis fallback sur un executable CLI (comme `a.out`).
 
 ## Pistes suivantes
 
