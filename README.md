@@ -45,7 +45,7 @@ Chaque bloc de 64 octets est absorbé dans un état initialisé avec 8 constante
 
 ## Prérequis
 
-Le programme a été pensé pour **Linux** avec **holyc-lang** (`hcc`).
+Le programme a ete pense pour **Linux** avec **holyc-lang** (`hcc`) et evite maintenant les casts explicites du style `(U32)x`, qui peuvent poser probleme selon certaines versions du parseur Ubuntu.
 
 Tu dois avoir :
 
@@ -117,6 +117,8 @@ Elle :
 3. initialise un état de 8 mots ;
 4. traite chaque bloc via `ProcessBlock` ;
 5. produit un digest final de **256 bits**.
+
+Pour rester compatible avec un environnement HolyC sur Ubuntu, le code utilise des variables temporaires pour charger les octets sur 32 bits au lieu de s'appuyer sur des casts explicites dans les expressions.
 
 L'affichage concatène ensuite les 8 mots de 32 bits en hexadécimal.
 

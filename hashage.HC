@@ -1,4 +1,4 @@
-extern "c" I32 scanf(U8 *fmt, ...); // lecture de l'entrée standard via scanf côté C
+extern "c" I32 scanf(U8 *fmt, ...); // lecture de l'entree standard via scanf cote C
 
 U32 RotR32(U32 x, I32 n)
 {
@@ -47,7 +47,14 @@ U32 StrLen(U8 *s)
 
 U32 LoadBE32(U8 *p)
 {
-    return ((U32)p[0] << 24) | ((U32)p[1] << 16) | ((U32)p[2] << 8) | (U32)p[3];
+    U32 b0, b1, b2, b3;
+
+    b0 = p[0];
+    b1 = p[1];
+    b2 = p[2];
+    b3 = p[3];
+
+    return (b0 << 24) | (b1 << 16) | (b2 << 8) | b3;
 }
 
 U0 InitState(U32 state[8])
@@ -68,6 +75,7 @@ U0 ProcessBlock(U32 state[8], U8 *block)
     U32 w[16];
     U32 a, b, c, d, e, f, g, h;
     U32 t1, t2;
+    U32 round_salt;
     I32 i;
 
     k[0] = 0x428A2F98;  k[1] = 0x71374491;  k[2] = 0xB5C0FBCF;  k[3] = 0xE9B5DBA5;
@@ -92,7 +100,8 @@ U0 ProcessBlock(U32 state[8], U8 *block)
         if (i >= 16)
             w[i & 15] = SmallSigma1(w[(i - 2) & 15]) + w[(i - 7) & 15] + SmallSigma0(w[(i - 15) & 15]) + w[(i - 16) & 15];
 
-        t1 = h + BigSigma1(e) + Ch(e, f, g) + k[i & 15] + w[i & 15] + (U32)(i * 0x9E3779B1);
+        round_salt = i * 0x9E3779B1;
+        t1 = h + BigSigma1(e) + Ch(e, f, g) + k[i & 15] + w[i & 15] + round_salt;
         t2 = BigSigma0(a) + Maj(a, b, c);
 
         h = g;
@@ -125,7 +134,8 @@ U0 HashStr(U8 *s, U32 digest[8]) // hash maison 256 bits inspire de SHA-256, mai
     U64 bit_len;
 
     len = StrLen(s);
-    bit_len = (U64)len * 8;
+    bit_len = len;
+    bit_len *= 8;
     total_len = (len + 9 + 63) & ~63;
 
     for (i = 0; i < len; i++)
@@ -154,14 +164,14 @@ U0 PrintDigest(U32 digest[8])
         digest[4], digest[5], digest[6], digest[7];
 }
 
-U0 Main() // point d'entrée principal
+U0 Main() // point d'entree principal
 {
     U8 texte[256];
     U32 digest[8];
     I32 lu;
 
     "Texte a hash : ";
-    lu = scanf(" %255[^\n]", texte); // lit jusqu'à 255 caractères et conserve les espaces
+    lu = scanf(" %255[^\n]", texte); // lit jusqu'a 255 caracteres et conserve les espaces
 
     if (lu != 1)
     {
