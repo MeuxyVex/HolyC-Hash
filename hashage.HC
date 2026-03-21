@@ -124,7 +124,7 @@ U0 ProcessBlock(U32 state[8], U8 *block)
     state[7] += h;
 }
 
-U0 HashStr(U8 *s, U32 digest[8]) // hash maison 256 bits inspire de SHA-256, mais non compatible SHA-256
+U0 HashTextRaw(U8 *s, U32 digest[8]) // API reutilisable : calcule le digest brut 256 bits
 {
     U8 buffer[320];
     U32 len;
@@ -157,17 +157,54 @@ U0 HashStr(U8 *s, U32 digest[8]) // hash maison 256 bits inspire de SHA-256, mai
         ProcessBlock(digest, buffer + i * 64);
 }
 
+U8 HexDigit(U8 value)
+{
+    if (value < 10)
+        return '0' + value;
+
+    return 'A' + value - 10;
+}
+
+U0 DigestToHex(U32 digest[8], U8 *hex_out)
+{
+    U32 i, j, word;
+    U8 nibble;
+
+    for (i = 0; i < 8; i++)
+    {
+        word = digest[i];
+
+        for (j = 0; j < 8; j++)
+        {
+            nibble = (word >> (28 - j * 4)) & 0xF;
+            hex_out[i * 8 + j] = HexDigit(nibble);
+        }
+    }
+
+    hex_out[64] = 0;
+}
+
+U0 HashTextHex(U8 *s, U8 *hex_out) // API orientee bibliotheque : renvoie directement le hash hex
+{
+    U32 digest[8];
+
+    HashTextRaw(s, digest);
+    DigestToHex(digest, hex_out);
+}
+
 U0 PrintDigest(U32 digest[8])
 {
-    "Hash (hex) : %08X%08X%08X%08X%08X%08X%08X%08X\n",
-        digest[0], digest[1], digest[2], digest[3],
-        digest[4], digest[5], digest[6], digest[7];
+    U8 hex_out[65];
+
+    DigestToHex(digest, hex_out);
+    "Hash (hex) : %s\n", hex_out;
 }
 
 U0 Main() // point d'entree principal
 {
     U8 texte[256];
     U32 digest[8];
+    U8 hex_out[65];
     I32 lu;
 
     "Texte a hash : ";
@@ -179,12 +216,14 @@ U0 Main() // point d'entree principal
         return;
     }
 
-    HashStr(texte, digest);
+    HashTextRaw(texte, digest);
+    DigestToHex(digest, hex_out);
 
     "Texte lu : %s\n", texte;
     "Algorithme : Hash maison 256 bits inspire de SHA-256\n";
+    "API lib : HashTextRaw / HashTextHex / DigestToHex\n";
     "Longueur max supportee : 255 caracteres\n";
-    PrintDigest(digest);
+    "Hash (hex) : %s\n", hex_out;
 }
 
 Main;

@@ -1,130 +1,115 @@
 # Hashage simple en HolyC
 
-Petit programme en **HolyC** qui lit une ligne de texte, calcule un **hash maison 256 bits inspiré de SHA-256**, puis affiche le résultat en **hexadécimal**.
+Petit projet en **HolyC** qui calcule un **hash maison 256 bits inspire de SHA-256**.
 
-## Ce que fait le programme
+Le projet est maintenant organise pour deux usages :
 
-- demande un texte à l'utilisateur ;
-- lit jusqu'à **255 caractères** ;
-- accepte les **espaces** dans la saisie ;
-- applique un hash **plus complexe et moins prédictible** que l'ancien FNV-1a ;
-- affiche le texte lu puis le digest hexadécimal sur **64 caractères**.
+- **CLI** : lancer un binaire et saisir une ligne de texte ;
+- **bibliotheque native** : appeler des fonctions reutilisables depuis un autre langage, par exemple **Python avec `ctypes`**.
 
-## Ce qui a changé
+## API exposee
 
-Le projet n'utilise plus un hash très simple de type multiplicatif, ni le FNV-1a 64 bits de la version précédente.
+Le fichier principal `hashage.HC` contient maintenant trois fonctions utiles pour une integration externe :
 
-À la place, il utilise maintenant un **hash maison 256 bits inspiré de SHA-256** avec :
+- `HashTextRaw(U8 *s, U32 digest[8])` : calcule le digest brut sur 8 mots de 32 bits ;
+- `DigestToHex(U32 digest[8], U8 *hex_out)` : convertit le digest brut en 64 caracteres hexadecimaux ;
+- `HashTextHex(U8 *s, U8 *hex_out)` : calcule directement le hash hexadecimal dans un buffer de **65 octets** (`64` caracteres + `\0`).
 
-- un état interne de **8 mots de 32 bits** ;
-- un traitement par **blocs de 64 octets** ;
-- un **padding** avec bit `1`, zéros, puis longueur du message ;
-- des opérations de **rotation**, **XOR**, **choix** (`Ch`) et **majorité** (`Maj`) ;
-- un mini **message schedule** recalculé sur 64 tours.
-
-> Ce hash est **inspiré** de SHA-256 dans sa structure générale, mais il **n'est pas compatible SHA-256** et ne doit pas être considéré comme cryptographiquement sûr.
+L'algorithme reste un **hash maison non standard** : il est **inspire de SHA-256**, mais il **n'est pas compatible SHA-256** et ne doit pas etre presente comme un hash cryptographique officiel.
 
 ## Structure de l'algorithme
 
-Le cœur du mélange utilise des fonctions proches, dans l'esprit, de SHA-256 :
+Le coeur du melange repose sur :
 
-```c
-Ch(x, y, z)
-Maj(x, y, z)
-BigSigma0(x)
-BigSigma1(x)
-SmallSigma0(x)
-SmallSigma1(x)
-```
+- un etat de **8 mots de 32 bits** ;
+- des rotations et XOR ;
+- les fonctions `Ch` et `Maj` ;
+- un message schedule sur **64 rounds** ;
+- un padding de type SHA-like sur blocs de **64 octets**.
 
-Chaque bloc de 64 octets est absorbé dans un état initialisé avec 8 constantes de 32 bits, puis mélangé sur **64 rounds**.
+## Utilisation en CLI
 
-## Fichier principal
-
-- `hashage.HC`
-
-## Prérequis
-
-Le programme a ete pense pour **Linux** avec **holyc-lang** (`hcc`) et evite maintenant les casts explicites du style `(U32)x`, qui peuvent poser probleme selon certaines versions du parseur Ubuntu.
-
-Tu dois avoir :
-
-- `hcc` installé ;
-- un système Linux compatible.
-
-## Compiler le programme
-
-Dans le dossier du projet :
+### Compiler
 
 ```bash
 hcc hashage.HC
 ```
 
-Cette commande génère en général un exécutable nommé `a.out`.
-
-## Exécuter le programme
+### Executer
 
 ```bash
 ./a.out
 ```
 
-## Exemple d'utilisation
-
-Entrée :
-
-```text
-bonjour tout le monde
-```
-
-Sortie :
+### Exemple
 
 ```text
 Texte a hash : bonjour tout le monde
 Texte lu : bonjour tout le monde
 Algorithme : Hash maison 256 bits inspire de SHA-256
+API lib : HashTextRaw / HashTextHex / DigestToHex
 Longueur max supportee : 255 caracteres
 Hash (hex) : 64-caracteres-hexadecimaux
 ```
 
+## Utilisation comme bibliotheque native
+
+L'objectif de cette version est de rendre l'algo appelable depuis un autre langage sans passer par `scanf` ni parser une sortie console complete.
+
+### Fonction la plus pratique
+
+Pour une integration externe, la fonction la plus simple est :
+
+```c
+U0 HashTextHex(U8 *s, U8 *hex_out)
+```
+
+Attendu :
+
+- `s` pointe vers une chaine terminee par `\0` ;
+- `hex_out` pointe vers un buffer de **65 octets minimum** ;
+- la fonction ecrit un hash hexadecimal en majuscules puis un terminateur nul.
+
+### Integration Python via `ctypes`
+
+Un exemple est fourni dans `python_ctypes_example.py`.
+
+Principe :
+
+1. charger une future bibliotheque partagee (ex. `libholyc_hash.so`) ;
+2. declarer la signature de `HashTextHex` ;
+3. envoyer un `bytes` UTF-8 ;
+4. recuperer le buffer de sortie hexadecimal.
+
+Extrait Python :
+
+```python
+import ctypes
+
+lib = ctypes.CDLL("./libholyc_hash.so")
+lib.HashTextHex.argtypes = [ctypes.c_char_p, ctypes.POINTER(ctypes.c_char)]
+lib.HashTextHex.restype = None
+
+out = ctypes.create_string_buffer(65)
+lib.HashTextHex(b"bonjour tout le monde", out)
+print(out.value.decode("ascii"))
+```
+
 ## Limites actuelles
 
-Le programme utilise :
+- le binaire CLI lit toujours une seule ligne avec `scanf(" %255[^\n]", texte)` ;
+- l'entree CLI est limitee a **255 caracteres** ;
+- la partie **bibliotheque** est prete au niveau API, mais la commande exacte pour produire une `.so` depend de ton environnement `hcc` Ubuntu ;
+- comme il s'agit d'un hash maison, il faut ajouter des **tests de reference** si tu veux garantir la compatibilite entre HolyC et Python.
 
-```c
-scanf(" %255[^\n]", texte);
-```
+## Fichiers
 
-Donc :
+- `hashage.HC` : implementation du hash, API reutilisable et CLI ;
+- `python_ctypes_example.py` : exemple minimal d'appel depuis Python.
 
-- la lecture est limitée à **255 caractères** ;
-- la saisie peut contenir des espaces ;
-- le programme lit une seule ligne ;
-- ce hash est **plus complexe**, mais reste un **hash maison non standard** ;
-- il est **plus proche dans l'esprit de SHA-256**, sans être un SHA-256 officiel.
+## Pistes suivantes
 
-## Fonctionnement du hash
-
-La fonction principale de hashage est :
-
-```c
-U0 HashStr(U8 *s, U32 digest[8])
-```
-
-Elle :
-
-1. mesure la longueur de la chaîne ;
-2. construit un message paddé aligné sur 64 octets ;
-3. initialise un état de 8 mots ;
-4. traite chaque bloc via `ProcessBlock` ;
-5. produit un digest final de **256 bits**.
-
-Pour rester compatible avec un environnement HolyC sur Ubuntu, le code utilise des variables temporaires pour charger les octets sur 32 bits au lieu de s'appuyer sur des casts explicites dans les expressions.
-
-L'affichage concatène ensuite les 8 mots de 32 bits en hexadécimal.
-
-## Pistes d'amélioration
-
-- comparer ce hash maison avec un vrai **SHA-256** ;
-- ajouter des tests avec plusieurs entrées et digests attendus ;
-- sortir l'algorithme dans un fichier séparé ;
-- ajouter un mode comparaison entre plusieurs algorithmes.
+- ajouter des vecteurs de test fixes ;
+- produire un vrai build de bibliotheque partagee si `hcc` le permet ;
+- ajouter un petit wrapper Python plus ergonomique ;
+- envisager ensuite un package `pip` qui charge la lib native.
