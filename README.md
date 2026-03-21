@@ -72,21 +72,25 @@ Attendu :
 
 ### Integration Python via `ctypes`
 
-Un exemple est fourni dans `python_ctypes_example.py`.
+Un exemple plus robuste est fourni dans `python_ctypes_example.py` : il accepte un chemin de bibliotheque en argument, regarde aussi `HOLYC_HASH_LIB`, puis affiche une erreur claire si aucun fichier partage n'est trouve.
 
 Principe :
 
 1. charger une future bibliotheque partagee (ex. `libholyc_hash.so`) ;
-2. declarer la signature de `HashTextHex` ;
-3. envoyer un `bytes` UTF-8 ;
-4. recuperer le buffer de sortie hexadecimal.
+2. accepter eventuellement son chemin via argument CLI ou `HOLYC_HASH_LIB` ;
+3. declarer la signature de `HashTextHex` ;
+4. envoyer un `bytes` UTF-8 ;
+5. recuperer le buffer de sortie hexadecimal.
 
 Extrait Python :
 
 ```python
 import ctypes
 
-lib = ctypes.CDLL("./libholyc_hash.so")
+# soit : python3 python_ctypes_example.py "bonjour" /chemin/vers/libholyc_hash.so
+# soit : HOLYC_HASH_LIB=/chemin/vers/libholyc_hash.so python3 python_ctypes_example.py
+
+lib = load_library()
 lib.HashTextHex.argtypes = [ctypes.c_char_p, ctypes.POINTER(ctypes.c_char)]
 lib.HashTextHex.restype = None
 
@@ -99,13 +103,13 @@ print(out.value.decode("ascii"))
 
 - le binaire CLI lit toujours une seule ligne avec `scanf(" %255[^\n]", texte)` ;
 - l'entree CLI est limitee a **255 caracteres** ;
-- la partie **bibliotheque** est prete au niveau API, mais la commande exacte pour produire une `.so` depend de ton environnement `hcc` Ubuntu ;
+- la partie **bibliotheque** est prete au niveau API, mais la commande exacte pour produire une `.so` depend encore de ton environnement `hcc` Ubuntu ;
 - comme il s'agit d'un hash maison, il faut ajouter des **tests de reference** si tu veux garantir la compatibilite entre HolyC et Python.
 
 ## Fichiers
 
 - `hashage.HC` : implementation du hash, API reutilisable et CLI ;
-- `python_ctypes_example.py` : exemple minimal d'appel depuis Python.
+- `python_ctypes_example.py` : exemple Python avec recherche de bibliotheque, chemin explicite et message d'erreur utile si le `.so` est absent.
 
 ## Pistes suivantes
 
